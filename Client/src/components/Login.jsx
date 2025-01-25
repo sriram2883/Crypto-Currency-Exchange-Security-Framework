@@ -1,41 +1,79 @@
 import React, { useState } from "react";
 import { Box, TextField, Button, Typography, Container, Snackbar } from "@mui/material";
 import MuiAlert from "@mui/material/Alert";
+import axios from "axios";
 
 const Alert = React.forwardRef(function Alert(props, ref) {
   return <MuiAlert elevation={6} ref={ref} variant="filled" {...props} />;
 });
 
-function Login({ onLoginSuccess }) {
+const API_BASE_URL = "http://localhost:5000/api/auth";
+
+function Auth({ onLoginSuccess }) {
+  const [isLogin, setIsLogin] = useState(true); // Toggle between Login and Register
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [open, setOpen] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
+  const [errorOpen, setErrorOpen] = useState(false);
+  const [successOpen, setSuccessOpen] = useState(false);
+  const [message, setMessage] = useState("");
 
-  const handleLogin = (event) => {
+  const handleAuth = async (event) => {
     event.preventDefault();
 
-    // Simple validation
-    if (!email || !password) {
-      setErrorMessage("Email and password are required!");
-      setOpen(true);
+    // Trim values to handle spaces
+    const trimmedEmail = email.trim();
+    const trimmedPassword = password.trim();
+
+    // Validation
+    if (!trimmedEmail || !trimmedPassword) {
+      setMessage("Email and password are required!");
+      setErrorOpen(true);
       return;
     }
 
-    // Mock login logic (replace with actual authentication logic)
-    if (email === "user@example.com" && password === "12345") {
-      onLoginSuccess(); // Trigger login success callback
+    try {
+      if (isLogin) {
+        // Login API call
+        const response = await axios.post(`${API_BASE_URL}/login`, {
+          username: trimmedEmail,
+          password: trimmedPassword,
+        });
+
+        const { token } = response.data;
+
+        // Store token in localStorage
+        localStorage.setItem("authToken", token);
+        onLoginSuccess(); // Trigger login success callback
+      } else {
+        // Register API call
+        await axios.post(`${API_BASE_URL}/register`, {
+          username: trimmedEmail,
+          password: trimmedPassword,
+        });
+
+        setMessage("Registration successful! Please log in.");
+        setSuccessOpen(true); // Open success Snackbar
+        setIsLogin(true); // Switch to login view
+      }
+
+      // Clear form
       setEmail("");
       setPassword("");
-      setErrorMessage("");
-    } else {
-      setErrorMessage("Invalid email or password.");
-      setOpen(true);
+    } catch (error) {
+      const errorMessage =
+        error.response && error.response.data && error.response.data.message
+          ? error.response.data.message
+          : isLogin
+          ? "Login failed! Please check your credentials."
+          : "Registration failed! Please try again.";
+      setMessage(errorMessage);
+      setErrorOpen(true); // Open error Snackbar
     }
   };
 
   const handleClose = () => {
-    setOpen(false);
+    setErrorOpen(false);
+    setSuccessOpen(false);
   };
 
   return (
@@ -52,9 +90,9 @@ function Login({ onLoginSuccess }) {
         }}
       >
         <Typography variant="h5" gutterBottom>
-          Login
+          {isLogin ? "Login" : "Register"}
         </Typography>
-        <Box component="form" onSubmit={handleLogin} sx={{ width: "100%", mt: 1 }}>
+        <Box component="form" onSubmit={handleAuth} sx={{ width: "100%", mt: 1 }}>
           <TextField
             margin="normal"
             required
@@ -74,22 +112,36 @@ function Login({ onLoginSuccess }) {
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            autoComplete="current-password"
+            autoComplete={isLogin ? "current-password" : "new-password"}
           />
           <Button type="submit" fullWidth variant="contained" sx={{ mt: 2 }}>
-            Login
+            {isLogin ? "Login" : "Register"}
           </Button>
         </Box>
+        <Typography
+          variant="body2"
+          sx={{ mt: 2, cursor: "pointer", color: "blue" }}
+          onClick={() => setIsLogin(!isLogin)}
+        >
+          {isLogin ? "Don't have an account? Register" : "Already have an account? Login"}
+        </Typography>
       </Box>
 
       {/* Snackbar for error messages */}
-      <Snackbar open={open} autoHideDuration={6000} onClose={handleClose}>
+      <Snackbar open={errorOpen} autoHideDuration={6000} onClose={handleClose}>
         <Alert onClose={handleClose} severity="error">
-          {errorMessage}
+          {message}
+        </Alert>
+      </Snackbar>
+
+      {/* Snackbar for success messages */}
+      <Snackbar open={successOpen} autoHideDuration={6000} onClose={handleClose}>
+        <Alert onClose={handleClose} severity="success">
+          {message}
         </Alert>
       </Snackbar>
     </Container>
   );
 }
 
-export default Login;
+export default Auth;
